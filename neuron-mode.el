@@ -128,7 +128,7 @@ Overrides `neuron-title-overlay-face' which you may inherif from."
   :group 'neuron
   :type  'stringp)
 
-(defcustom neuron-rib-server-port 8080
+(defcustom neuron-rib-server-port 8000
   "The port on which the rib server is started."
   :group 'neuron
   :type  'integerp)
@@ -804,7 +804,11 @@ ARGS is the arguments to pass to the neuron query command."
 (defun neuron--get-zettel-id (&optional buffer)
   "Extract the zettel ID of BUFFER."
   (interactive "b")
-  (f-base (buffer-file-name buffer)))
+  (f-no-ext
+   (apply #'f-join
+          (cdr (seq-drop-while
+                (lambda (x) (not (equal x "Zettels")))
+                (f-split (buffer-file-name buffer)))))))
 
 (defun neuron--open-page (rel-path)
   "Open the REL-PATH in the browser.
@@ -979,7 +983,7 @@ QUERY is an alist containing at least the query type and the URL."
   "Open the web application in the web browser at the current zettel note."
   (interactive)
   (neuron-check-if-zettelkasten-exists)
-  (let ((id (f-base (buffer-file-name))))
+  (let ((id (neuron--get-zettel-id)))
     (neuron-rib-open-page (concat id ".html"))))
 
 ;;;###autoload
