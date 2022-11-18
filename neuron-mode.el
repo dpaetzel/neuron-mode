@@ -33,6 +33,7 @@
 
 ;;; Code:
 
+(require 'request)
 (require 'f)
 (require 's)
 (require 'cl-macs)
@@ -329,11 +330,45 @@ Extract only the result itself, so the query type is lost."
 (defvar neuron--zettel-cache nil
   "Map containing all zettels indexed by their ID.")
 
+(defun neuron--zettel-id-from-filename (fname)
+  "Retrieve the corresponding Zettel's ID from the given file name FNAME."
+  ;; The t of prin1-to-string stands for noescape.
+  (f-base (prin1-to-string fname t)))
+
 (defun neuron--rebuild-cache ()
   "Rebuild the zettel cache with the current zettelkasten."
-  (let ((zettels (neuron--query-command "--zettels"))
-        (assoc-id (lambda (zettel) (cons (intern (map-elt zettel 'ID)) zettel))))
-    (setq neuron--zettel-cache (mapcar assoc-id zettels))))
+  (let ((assoc-id
+         (lambda (zettel)
+           (let ((id (neuron--zettel-id-from-filename (car zettel))))
+           (cons (intern id)
+            (cons
+            (cons 'ID id)
+            (cdr zettel))))))
+        ;; TODO Right now we filter out Zettels without meta data in order to
+        ;; get rid of the virtual Zettels created by Emanote for each folder we
+        ;; have. This is of course risky as there may be actual Zettels without
+        ;; metadata.
+        (pred
+         (lambda (zettel)
+           (not (eq nil (alist-get 'meta (cdr zettel)))))))
+    (request
+      (format
+       "http://%s:%d/-/%s"
+       neuron-rib-server-host
+       neuron-rib-server-port
+       "export.json")
+      :sync t
+      :parser #'json-read
+      :error
+      (cl-function
+       (lambda (&key data &allow-other-keys)
+       (message "Could not connect to server or json parsing failed.")))
+      :success
+      (cl-function
+       (lambda (&key data &allow-other-keys)
+         (setq neuron--zettel-cache
+               (seq-filter pred
+                           (mapcar assoc-id (alist-get 'files data)))))))))
 
 (defun neuron-list-buffers ()
   "Return the list of all open neuron-mode buffers in the current zettelkasten."
@@ -359,6 +394,8 @@ Extract only the result itself, so the query type is lost."
                        (neuron--setup-overlays)
                        (neuron--name-buffer))
                      (with-current-buffer buffer (neuron--name-buffer)))
+                   ;; TODO This message is printed even if the server connection
+                   ;; failed.
                    (message "Regenerated zettel cache")))
                "neuron-refresh"))
 
@@ -455,7 +492,7 @@ When TITLE is nil, prompt the user."
 
 (defun neuron--style-zettel-id (zid)
   "Style a ZID as shown in the completion prompt."
-  (propertize (format "[[[%s]]]" zid) 'face 'neuron-link-face))
+  (propertize (format "[[%s]]" zid) 'face 'neuron-link-face))
 
 (defun neuron--style-tags (tags)
   "Style TAGS as shown in the completion prompt when selecting a zettel."
@@ -465,10 +502,9 @@ When TITLE is nil, prompt the user."
 
 (defun neuron--propertize-zettel (zettel)
   "Format ZETTEL as shown in the selection prompt."
-  (let ((id (alist-get 'ID zettel))
-        (title (alist-get 'Title zettel))
-        (tags (neuron--get-zettel-tags zettel)))
-    (format "%s %s %s" (neuron--style-zettel-id id) title (neuron--style-tags tags))))
+  (let ((title (alist-get 'title zettel))
+        (ID (alist-get 'ID zettel)))
+    (format "%s %s" (neuron--style-zettel-id ID) title)))
 
 (defun neuron--select-zettel-from-list (zettels &optional prompt require-match)
   "Select a zettel from a given list.
@@ -480,6 +516,10 @@ non-nil require the input to match an existing zettel."
                           (mapcar #'neuron--propertize-zettel zettels)
                           nil
                           require-match)))
+    ;; This tests whether we got a match by checking whether the Zettel link
+    ;; regex matches the selection (which does if we selected an entry because
+    ;; we add to each entries the Zettel ID formatted the same way as it is
+    ;; formatted in links).
     (if (string-match (eval `(rx bos (regexp ,neuron-link-regex))) selection)
         ;; The selection is among the candidates
         (neuron--get-cached-zettel-from-id (match-string 1 selection))
@@ -505,7 +545,7 @@ PROMPT is the prompt passed to `completing-read'."
 
 (defun neuron--get-zettel-path (zettel)
   "Get the absolute path of ZETTEL."
-  (f-join "/" neuron--current-zettelkasten (alist-get 'Path zettel)))
+  (f-join "/" neuron--current-zettelkasten (alist-get 'filePath (cdr zettel))))
 
 (defun neuron--get-plugin-data (plugin-data-list plugin i)
   "Extract from all plugin data the part that is relevant for a given plugin.
