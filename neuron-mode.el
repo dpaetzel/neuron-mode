@@ -461,7 +461,7 @@ If NO-DEFAULT-TAGS is non-nil, don't add the tags specified the variable
 (defun neuron--get-zettel-title (id)
   "Get the title of the zettel with an id of ID.
 Returns nil if no such zettle is found."
-  (alist-get 'Title (neuron--get-cached-zettel-from-id id) nil))
+  (alist-get 'title (neuron--get-cached-zettel-from-id id) nil))
 
 ;;;###autoload
 (defun neuron-new-zettel (&optional title id)
@@ -1126,7 +1126,7 @@ When no tag has a particular face, return the default `neuron-title-overlay-face
 OV is the overay to setup or update and CONN describes whether the link is a
 folgezettel or an ordinary connection."
   (if-let* ((zettel (ignore-errors (neuron--get-cached-zettel-from-id id)))
-            (title (alist-get 'Title zettel))
+            (title (alist-get 'title zettel))
             (title-face (neuron--get-title-face-for-tags (neuron--get-zettel-tags zettel)))
             (title-suffix (if (eq conn 'folgezettel) " ᛦ" "")))
       (if neuron-show-ids
@@ -1193,7 +1193,7 @@ link is a folgezettel of ordinary connection."
 
 (defun company-neuron--fuzzy-match-title (prefix candidate)
   "Return whether PREFIX fuzzily matches the title of the CANDIDATE zettel."
-  (let ((full-title (alist-get 'Title (get-text-property 0 'zettel candidate))))
+  (let ((full-title (alist-get 'title (get-text-property 0 'zettel candidate))))
     (cl-subsetp (string-to-list prefix)
                 (string-to-list full-title))))
 
@@ -1201,7 +1201,7 @@ link is a folgezettel of ordinary connection."
   "Propertize a zettel title to contain all information about ZETTEL.
 The resulting title is truncated and padded to fit the width given by
 `neuron-max-completion-width'."
-  (let* ((title (alist-get 'Title zettel))
+  (let* ((title (alist-get 'title zettel))
          (padded (s-pad-right neuron-max-completion-width " " title))
          (truncated (s-truncate neuron-max-completion-width padded)))
     (propertize truncated 'zettel zettel)))
