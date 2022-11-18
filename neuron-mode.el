@@ -616,7 +616,7 @@ otherwise return nil."
 (defun neuron--insert-zettel-link-from-id (id)
   "Insert a zettel link."
   (progn
-    (insert (format "[[[%s]]]" id))
+    (insert (format "[[%s]]" id))
     (neuron--setup-overlays)))
 
 (defun neuron-insert-zettel-link ()
