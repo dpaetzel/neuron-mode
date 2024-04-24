@@ -520,6 +520,10 @@ non-nil require the input to match an existing zettel."
     ;; regex matches the selection (which does if we selected an entry because
     ;; we add to each entries the Zettel ID formatted the same way as it is
     ;; formatted in links).
+    ;;
+    ;; This is rather ugly and produced problems at least once already
+    ;; (2024-04-24 where I had Zettel file names contain characters (i.e. @)
+    ;; which where not matched by neuron-link-regex).
     (if (string-match (eval `(rx bos (regexp ,neuron-link-regex))) selection)
         ;; The selection is among the candidates
         (neuron--get-cached-zettel-from-id (match-string 1 selection))
@@ -881,7 +885,9 @@ The path is relative to the neuron output directory."
   (neuron--open-zettel-from-id (funcall-interactively #'neuron--get-zettel-id)))
 
 (defconst neuron-link-regex
-  (concat "\\[\\{2,3\\}\\(z:" thing-at-point-url-path-regexp "\\|[[:alnum:]-_ ]+\\(?:\?[^][\t\n\\ {}]*\\)?\\)]]\\(]\\)*")
+  ;; Note that this is also used to check whether an existing Zettel was
+  ;; selected in neuron--select-zettel-from-list.
+  (concat "\\[\\{2,3\\}\\(z:" thing-at-point-url-path-regexp "\\|[[:alnum:]-_@ ]+\\(?:\?[^][\t\n\\ {}]*\\)?\\)]]\\(]\\)*")
   "Regex matching zettel links like [[[URL/ID]]] or [[URL/ID]] .
 Group 1 is the matched ID or URL.")
 
