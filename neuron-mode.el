@@ -165,6 +165,11 @@ If non-nil, the zettel title will be included in the buffer name."
   "Face for zettel IDs in zettels and prompts"
   :group 'neuron-faces)
 
+(defface neuron-date-face
+  '((t :inherit shadow))
+  "Face for tags in prompts."
+  :group 'neuron-faces)
+
 (defface neuron-invalid-zettel-id-face
   '((t :inherit error))
   "Face for links that point to non existent zettels."
@@ -408,16 +413,21 @@ Valid IDs should be strings of alphanumeric characters."
   (neuron-check-if-zettelkasten-exists)
   (unless id
     (setq id (pcase neuron-id-format
+               ;; If neuron-id-format was set to 'prompt, then …
                ('prompt
                 (if-let* ((id (read-string "ID: "))
                           ((neuron--is-valid-id id)))
                     id
                   (user-error "Invalid zettel ID: %S" id)))
+               ;; If neuron-id-format was set to something that which makes
+               ;; `functionp' return non-nil, then …
                ((pred functionp)
                 (let ((id (funcall neuron-id-format title)))
                   (if (neuron--is-valid-id id)
                       id
                     (user-error "Invalid zettel ID: %S" id)))))))
+  ;; If neither 'prompt nor a `functionp', then don't give any ID to `new' which
+  ;; results in neuron creating an ID by itself.
   (let ((args (if id (list id) nil)))
     (apply #'neuron--make-command "new" args)))
 
@@ -492,7 +502,7 @@ When TITLE is nil, prompt the user."
 
 (defun neuron--style-zettel-id (zid)
   "Style a ZID as shown in the completion prompt."
-  (propertize (format "[[%s]]" zid) 'face 'neuron-link-face))
+  (propertize (format "[[%8s]]" zid) 'face 'neuron-link-face))
 
 (defun neuron--style-tags (tags)
   "Style TAGS as shown in the completion prompt when selecting a zettel."
@@ -500,11 +510,16 @@ When TITLE is nil, prompt the user."
       ""
     (propertize (format "(%s)" (s-join ", " tags)) 'face 'neuron-zettel-tag-face)))
 
+(defun neuron--style-zettel-date (date)
+  "Style a Zettel date as shown in the completion prompt."
+  (propertize (format "<%16s>" date) 'face 'neuron-date-face))
+
 (defun neuron--propertize-zettel (zettel)
   "Format ZETTEL as shown in the selection prompt."
   (let ((title (alist-get 'title zettel))
-        (ID (alist-get 'ID zettel)))
-    (format "%s %s" (neuron--style-zettel-id ID) title)))
+        (ID (alist-get 'ID zettel))
+        (date (alist-get 'date (alist-get 'meta zettel))))
+    (format "%s %s %s" (neuron--style-zettel-id ID) (neuron--style-zettel-date date) title)))
 
 (defun neuron--select-zettel-from-list (zettels &optional prompt require-match)
   "Select a zettel from a given list.
@@ -629,6 +644,7 @@ otherwise return nil."
   (neuron-check-if-zettelkasten-exists)
   (neuron--insert-zettel-link-from-id (map-elt (neuron-select-zettel "Link zettel: ") 'ID)))
 
+;; TODO FIXME Make it possible to select a folder here
 (defun neuron-insert-new-zettel ()
   "Create a new zettel."
   (interactive)
